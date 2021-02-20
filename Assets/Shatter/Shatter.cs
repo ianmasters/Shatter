@@ -36,14 +36,8 @@ namespace Examples.Scripts
 
             if (enableTestPlane && testPlane)
             {
-#if !Q
                 var plane = new Plane(testPlane.transform.up, testPlane.transform.position);
-#else
-                var plane = new EzySlice.Plane(
-                    obj.transform.InverseTransformPoint(testPlane.transform.position),
-                    obj.transform.InverseTransformDirection(testPlane.transform.up)
-                );
-#endif
+                
                 slicedHull = obj.SliceInstantiate(
                     plane,
                     textureRegion,

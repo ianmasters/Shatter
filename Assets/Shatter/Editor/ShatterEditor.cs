@@ -30,14 +30,20 @@ namespace Examples.Scripts.Editor
 
             script.crossSectionMaterial = (Material)EditorGUILayout.ObjectField("Cross Section Material", script.crossSectionMaterial, typeof(Material), false);
 
-            script.enableTestPlane = EditorGUILayout.Toggle("Enable Test Plane", script.enableTestPlane);
+            var enableTestPlane = EditorGUILayout.Toggle("Enable Test Plane", script.enableTestPlane);
+            if (enableTestPlane != script.enableTestPlane)
+            {
+                Undo.RegisterFullObjectHierarchyUndo(script.gameObject, "Enable Test Plane");
+                script.enableTestPlane = enableTestPlane;
+            }
+            
             if (script.enableTestPlane)
                 script.testPlane = (GameObject)EditorGUILayout.ObjectField("Test Plane", script.testPlane, typeof(GameObject), true);
             else
                 script.shatterCount = EditorGUILayout.IntSlider("Shatter Count", script.shatterCount, 1, 20);
 
             GUI.backgroundColor = Color.yellow;
-            if (GUILayout.Button($"\n{(script.enableTestPlane ? "Slice" : "Shatter")} {script.objectToShatter.name}\n"))
+            if (GUILayout.Button($"\n{(script.enableTestPlane ? "Slice" : "Shatter")} '{script.objectToShatter.name}'\n"))
             {
                 const string undoName = "Shatter";
 
