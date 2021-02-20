@@ -1,0 +1,209 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+// ReSharper disable once CheckNamespace
+namespace EzySlice
+{
+    /**
+     * Contains static functionality for performing Triangulation on arbitrary vertices.
+     * Read the individual function descriptions for specific details.
+     */
+    // ReSharper disable once IdentifierTypo
+    public static class Triangulator
+    {
+        /**
+         * Represents a 3D Vertex which has been mapped onto a 2D surface
+         * and is mainly used in MonotoneChain to triangulate a set of vertices
+         * against a flat plane.
+         */
+        private readonly struct Mapped2D
+        {
+            public Mapped2D(in Vector3 newOriginal, in Vector3 u, in Vector3 v)
+            {
+                OriginalValue = newOriginal;
+                MappedValue = new Vector2(Vector3.Dot(newOriginal, u), Vector3.Dot(newOriginal, v));
+            }
+
+            public Vector2 MappedValue { get; }
+
+            public Vector3 OriginalValue { get; }
+        }
+
+        /**
+         * Overloaded variant of MonotoneChain which will calculate UV coordinates of the Triangles
+         * between 0.0 and 1.0 (default).
+         * 
+         * See MonotoneChain(vertices, Normal, tri, TextureRegion) for full explanation
+         */
+        public static bool MonotoneChain(in List<Vector3> vertices, in Vector3 normal, out List<Triangle> tri)
+        {
+            // default texture region is in coordinates 0,0 to 1,1
+            return MonotoneChain(vertices, normal, out tri, new TextureRegion(0.0f, 0.0f, 1.0f, 1.0f));
+        }
+
+        /**
+         * O(n log n) Convex Hull Algorithm. 
+         * Accepts a list of vertices as Vector3 and triangulates them according to a projection
+         * plane defined as planeNormal. Algorithm will output vertices, indices and UV coordinates
+         * as arrays
+         */
+        public static bool MonotoneChain(in List<Vector3> vertices, in Vector3 normal, out List<Triangle> tri, in TextureRegion texRegion)
+        {
+            var count = vertices.Count;
+
+            // we cannot triangulate less than 3 points. Use minimum of 3 points
+            if (count < 3)
+            {
+                tri = null;
+                return false;
+            }
+
+            // first, we map from 3D points into a 2D plane represented by the provided Normal
+            var u = Vector3.Normalize(Vector3.Cross(normal, Vector3.up));
+            if (Vector3.zero == u)
+            {
+                u = Vector3.Normalize(Vector3.Cross(normal, Vector3.forward));
+            }
+            var v = Vector3.Cross(u, normal);
+
+            // generate an array of mapped values
+            var mapped = new Mapped2D[count];
+
+            // these values will be used to generate new UV coordinates later on
+            var maxDivX = float.MinValue;
+            var maxDivY = float.MinValue;
+            var minDivX = float.MaxValue;
+            var minDivY = float.MaxValue;
+
+            // map the 3D vertices into the 2D mapped values
+            for (var i = 0; i < count; i++)
+            {
+                Vector3 vertToAdd = vertices[i];
+
+                Mapped2D newMappedValue = new Mapped2D(vertToAdd, u, v);
+                Vector2 mapVal = newMappedValue.MappedValue;
+
+                // grab our maximal values so we can map UV's in a proper range
+                maxDivX = Mathf.Max(maxDivX, mapVal.x);
+                maxDivY = Mathf.Max(maxDivY, mapVal.y);
+                minDivX = Mathf.Min(minDivX, mapVal.x);
+                minDivY = Mathf.Min(minDivY, mapVal.y);
+
+                mapped[i] = newMappedValue;
+            }
+
+            // sort our newly generated array values
+            Array.Sort(mapped, (a, b) =>
+            {
+                var x = a.MappedValue;
+                var p = b.MappedValue;
+
+                return (x.x < p.x || (Math.Abs(x.x - p.x) < float.Epsilon && x.y < p.y)) ? -1 : 1;
+            });
+
+            // our final hull mappings will end up in here
+            var hulls = new Mapped2D[count + 1];
+
+            var k = 0;
+
+            // build the lower hull of the chain
+            for (var i = 0; i < count; i++)
+            {
+                while (k >= 2)
+                {
+                    var mA = hulls[k - 2].MappedValue;
+                    var mB = hulls[k - 1].MappedValue;
+                    var mC = mapped[i].MappedValue;
+
+                    if (Intersector.TriArea2D(mA.x, mA.y, mB.x, mB.y, mC.x, mC.y) > 0.0f)
+                    {
+                        break;
+                    }
+
+                    k--;
+                }
+
+                hulls[k++] = mapped[i];
+            }
+
+            // build the upper hull of the chain
+            for (int i = count - 2, t = k + 1; i >= 0; i--)
+            {
+                while (k >= t)
+                {
+                    var mA = hulls[k - 2].MappedValue;
+                    var mB = hulls[k - 1].MappedValue;
+                    var mC = mapped[i].MappedValue;
+
+                    if (Intersector.TriArea2D(mA.x, mA.y, mB.x, mB.y, mC.x, mC.y) > 0.0f)
+                    {
+                        break;
+                    }
+
+                    k--;
+                }
+
+                hulls[k++] = mapped[i];
+            }
+
+            // finally we can build our mesh, generate all the variables
+            // and fill them up
+            var vertCount = k - 1;
+            var triCount = (vertCount - 2) * 3;
+
+            // this should not happen, but here just in case
+            if (vertCount < 3)
+            {
+                tri = null;
+                return false;
+            }
+
+            // ensure List does not dynamically grow, performing copy ops each time!
+            tri = new List<Triangle>(triCount / 3);
+
+            var width = maxDivX - minDivX;
+            var height = maxDivY - minDivY;
+
+            var indexCount = 1;
+
+            // generate both the vertices and uv's in this loop
+            for (var i = 0; i < triCount; i += 3)
+            {
+                // the Vertices in our triangle
+                var posA = hulls[0];
+                var posB = hulls[indexCount];
+                var posC = hulls[indexCount + 1];
+
+                // generate UV Maps
+                var uvA = posA.MappedValue;
+                var uvB = posB.MappedValue;
+                var uvC = posC.MappedValue;
+
+                uvA.x = (uvA.x - minDivX) / width;
+                uvA.y = (uvA.y - minDivY) / height;
+
+                uvB.x = (uvB.x - minDivX) / width;
+                uvB.y = (uvB.y - minDivY) / height;
+
+                uvC.x = (uvC.x - minDivX) / width;
+                uvC.y = (uvC.y - minDivY) / height;
+
+                var newTriangle = new Triangle(posA.OriginalValue, posB.OriginalValue, posC.OriginalValue);
+
+                // ensure our UV coordinates are mapped into the requested TextureRegion
+                newTriangle.SetUV(texRegion.Map(uvA), texRegion.Map(uvB), texRegion.Map(uvC));
+
+                // the normals is the same for all vertices since the final mesh is completely flat
+                newTriangle.SetNormal(normal, normal, normal);
+                newTriangle.ComputeTangents();
+
+                tri.Add(newTriangle);
+
+                indexCount++;
+            }
+
+            return true;
+        }
+    }
+}
