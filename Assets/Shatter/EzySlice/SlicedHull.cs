@@ -1,3 +1,4 @@
+using System.Security.Authentication.ExtendedProtection.Configuration;
 using UnityEngine;
 using Extensions;
 
@@ -14,10 +15,19 @@ namespace EzySlice
         private readonly Mesh[] hullMesh = new Mesh[2];
         private readonly float[] hullVolume = new float[2];
 
+        private static int _upperHullId;
+        private static int _lowerHullId;
+
+        public static void ResetDebug()
+        {
+            _upperHullId = _lowerHullId = 0;
+        }
+
         public float SourceVolume => hullVolume[0] + hullVolume[1];
 
         public GameObject HullObject(int i)
         {
+            Debug.Assert(i >= 0 && i < 2);
             return hull[i];
         }
 
@@ -40,10 +50,13 @@ namespace EzySlice
             hullVolume[1] = lowerHullMesh.CalculateVolume(lowerHullVertices);
         }
 
-        private void CreateHull(GameObject newObject, GameObject original, Material crossSectionMat)
+        private void CreateHull(int hullIndex, GameObject original, Material crossSectionMat)
         {
+            GameObject newObject = hull[hullIndex];
             if (newObject)
             {
+                Mesh newMesh = hullMesh[hullIndex];
+
                 newObject.transform.localPosition = original.transform.localPosition;
                 newObject.transform.localRotation = original.transform.localRotation;
                 newObject.transform.localScale = original.transform.localScale;
@@ -53,36 +66,37 @@ namespace EzySlice
 
                 // nothing changed in the hierarchy, the cross section must have been batched
                 // with the sub meshes, return as is, no need for any changes
-                if (mesh.subMeshCount == hullMesh[0].subMeshCount)
+                if (mesh.subMeshCount == newMesh.subMeshCount)
                 {
                     // the the material information
                     newObject.GetComponent<Renderer>().sharedMaterials = shared;
                 }
+                else
+                {
+                    // otherwise the cross section was added to the back of the sub mesh array because
+                    // it uses a different material. We need to take this into account
+                    var newShared = new Material[shared.Length + 1];
 
-                // otherwise the cross section was added to the back of the sub mesh array because
-                // it uses a different material. We need to take this into account
-                var newShared = new Material[shared.Length + 1];
-
-                // copy our material arrays across using native copy (should be faster than loop)
-                System.Array.Copy(shared, newShared, shared.Length);
-                newShared[shared.Length] = crossSectionMat;
-
-                // the the material information
-                newObject.GetComponent<Renderer>().sharedMaterials = newShared;
+                    // copy our material arrays across using native copy (should be faster than loop)
+                    System.Array.Copy(shared, newShared, shared.Length);
+                    newShared[shared.Length] = crossSectionMat;
+                    // the the material information
+                    newObject.GetComponent<Renderer>().sharedMaterials = newShared;
+                }
             }
         }
 
         public GameObject CreateUpperHull(GameObject original, Material crossSectionMat)
         {
             hull[0] = CreateUpperHull();
-            CreateHull(hull[0], original, crossSectionMat);
+            CreateHull(0, original, crossSectionMat);
             return hull[0];
         }
 
         public GameObject CreateLowerHull(GameObject original, Material crossSectionMat)
         {
             hull[1] = CreateLowerHull();
-            CreateHull(hull[1], original, crossSectionMat);
+            CreateHull(1, original, crossSectionMat);
             return hull[1];
         }
 
@@ -90,8 +104,6 @@ namespace EzySlice
          * Generate a new GameObject from the upper hull of the mesh
          * This function will return null if upper hull does not exist
          */
-        private static int _upperHullId;
-
         private GameObject CreateUpperHull()
         {
             return CreateEmptyObject($"Upper_Hull {_upperHullId++}", hullMesh[0]);
@@ -101,20 +113,11 @@ namespace EzySlice
          * Generate a new GameObject from the Lower hull of the mesh
          * This function will return null if lower hull does not exist
          */
-        private static int _lowerHullId;
 
         private GameObject CreateLowerHull()
         {
             return CreateEmptyObject($"Lower_Hull {_lowerHullId++}", hullMesh[1]);
         }
-
-        // public Mesh upperHullMesh {
-        //     get { return this.UpperHull; }
-        // }
-        //
-        // public Mesh lowerHullMesh {
-        //     get { return this.LowerHull; }
-        // }
 
         /**
          * Helper function which will create a new GameObject to be able to add
@@ -125,12 +128,12 @@ namespace EzySlice
             if (!hull)
                 return null;
 
+            hull.name = name;
+            
             var newObject = new GameObject(name);
 
             newObject.AddComponent<MeshRenderer>();
-            var filter = newObject.AddComponent<MeshFilter>();
-
-            filter.mesh = hull;
+            newObject.AddComponent<MeshFilter>().mesh = hull;
 
             return newObject;
         }

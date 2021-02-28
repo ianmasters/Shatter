@@ -1,8 +1,11 @@
+using System;
+using EzySlice;
 using UnityEditor;
+using UnityEditorInternal;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace Examples.Scripts.Editor
+namespace Shatter.Editor
 {
     /**
  * This is a simple Editor helper script for rapid testing/prototyping! 
@@ -12,7 +15,9 @@ namespace Examples.Scripts.Editor
     {
         public override void OnInspectorGUI()
         {
-            Shatter script = (Shatter)target;
+            // serializedObject.Update(); // TODO: is this required - surely not?
+
+            var script = (Shatter)target;
 
             script.objectToShatter = (GameObject)EditorGUILayout.ObjectField("Object to Shatter", script.objectToShatter, typeof(GameObject), true);
 
@@ -30,18 +35,26 @@ namespace Examples.Scripts.Editor
 
             script.crossSectionMaterial = (Material)EditorGUILayout.ObjectField("Cross Section Material", script.crossSectionMaterial, typeof(Material), false);
 
-            var enableTestPlane = EditorGUILayout.Toggle("Enable Test Plane", script.enableTestPlane);
-            if (enableTestPlane != script.enableTestPlane)
+            var destroyOnComplete = (Shatter.DestroyOnCompleteType)EditorGUILayout.EnumPopup("Destroy on Complete", script.destroyOnComplete);
+            if (destroyOnComplete != script.destroyOnComplete)
             {
-                Undo.RegisterFullObjectHierarchyUndo(script.gameObject, "Enable Test Plane");
-                script.enableTestPlane = enableTestPlane;
+                Undo.RegisterFullObjectHierarchyUndo(script, "Destroy on Complete");
+                script.destroyOnComplete = destroyOnComplete;
             }
-            
+
+            var en = EditorGUILayout.Toggle("Enable Test Plane", script.enableTestPlane);
+            if (en != script.enableTestPlane)
+            {
+                Undo.RegisterFullObjectHierarchyUndo(script, "Enable Test Plane");
+                script.enableTestPlane = en;
+            }
+
             if (script.enableTestPlane)
                 script.testPlane = (GameObject)EditorGUILayout.ObjectField("Test Plane", script.testPlane, typeof(GameObject), true);
             else
                 script.shatterCount = EditorGUILayout.IntSlider("Shatter Count", script.shatterCount, 1, 20);
 
+            var colorSave = GUI.backgroundColor;
             GUI.backgroundColor = Color.yellow;
             if (GUILayout.Button($"\n{(script.enableTestPlane ? "Slice" : "Shatter")} '{script.objectToShatter.name}'\n"))
             {
@@ -53,28 +66,39 @@ namespace Examples.Scripts.Editor
                 Undo.SetCurrentGroupName(undoName);
 
                 Undo.RegisterFullObjectHierarchyUndo(script.objectToShatter, undoName);
+                // Undo.RegisterCompleteObjectUndo(script.shards, undoName);
+                
+#if UNITY_EDITOR
+                SlicedHull.ResetDebug();
+#endif
 
                 // Perform the action
-                for (var i = 0; i < script.shatterCount; ++i)
-                {
+                if (script.enableTestPlane)
+                    script.SlicePlane(script.testPlane);
+                else
                     script.RandomShatter();
-                }
 
-                var objects = System.Array.ConvertAll(script.Shards.ToArray(), o => (Object)o);
+                var objects = Array.ConvertAll(script.shards.ToArray(), o => (Object)o);
+
+                // if(script.enableTestPlane)
                 Selection.objects = objects;
 
-                foreach (var o in script.Shards)
+                foreach (var o in script.shards)
                 {
                     Undo.RegisterCreatedObjectUndo(o, undoName);
                 }
 
                 Undo.CollapseUndoOperations(Undo.GetCurrentGroup());
             }
+            GUI.backgroundColor = colorSave;
 
-            if (GUI.changed) // once you have an editor script apparently you are responsible for doing this
-            {
+            // once you have an editor script apparently you are responsible for doing this
+            if (GUI.changed)
                 script.OnValidate();
-            }
+
+            // if(script.objectToShatter.gameObject != script.gameObject)
+            if(script)
+                serializedObject.ApplyModifiedProperties();
         }
     }
 }

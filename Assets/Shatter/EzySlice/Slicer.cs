@@ -75,8 +75,16 @@ namespace EzySlice
                 return null;
             }
 
+            // TODO: only a copy here currently works. Pass in a copy?
+#if !POO
             var materials = renderer.sharedMaterials;
-
+#else
+            Material[] materials;
+            if (Application.isPlaying)
+                materials = renderer.sharedMaterials;
+            else
+                materials = renderer.materials;
+#endif
             var mesh = filter.sharedMesh;
 
             // cannot shatterCount a mesh that doesn't exist
@@ -270,7 +278,7 @@ namespace EzySlice
         /**
          * Generates a single SlicedHull from a set of cut sub meshes 
          */
-        private static SlicedHull CreateFrom(in SlicedSubMesh[] meshes, in List<Triangle> cross, int crossSectionIndex)
+        private static SlicedHull CreateFrom(in SlicedSubMesh[] meshes, in List<Triangle> crossRegion, int crossSectionIndex)
         {
             var subMeshCount = meshes.Length;
 
@@ -284,8 +292,8 @@ namespace EzySlice
                 lowerHullCount += meshes[subMesh].lowerHull.Count;
             }
 
-            Mesh upperHull = CreateUpperHull(meshes, upperHullCount, cross, crossSectionIndex, out var upperHullVertices);
-            Mesh lowerHull = CreateLowerHull(meshes, lowerHullCount, cross, crossSectionIndex, out var lowerHullVertices);
+            Mesh upperHull = CreateUpperHull(meshes, upperHullCount, crossRegion, crossSectionIndex, out var upperHullVertices);
+            Mesh lowerHull = CreateLowerHull(meshes, lowerHullCount, crossRegion, crossSectionIndex, out var lowerHullVertices);
 
             return new SlicedHull(upperHull, lowerHull, upperHullVertices, lowerHullVertices);
         }

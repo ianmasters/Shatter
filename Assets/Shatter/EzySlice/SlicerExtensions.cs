@@ -67,7 +67,6 @@ namespace EzySlice
         public static SlicedHull SliceInstantiate(this GameObject obj, in Plane planeInWorldSpace, in TextureRegion cuttingRegion, Material crossSectionMaterial = null)
         {
             // Transform the plane into object space for cutting
-            // var plane = obj.transform.InverseTransformPlane(planeInWorldSpace);
             var plane = obj.transform.InverseTransformPlane(planeInWorldSpace);
             
             var slicedHull = Slicer.Slice(obj, plane, cuttingRegion, crossSectionMaterial);
