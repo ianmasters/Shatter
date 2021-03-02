@@ -9,63 +9,63 @@ namespace Shatter.Editor
     [CustomEditor(typeof(Shatter))]
     public class ShatterEditor : UnityEditor.Editor
     {
-        private Shatter script;
+        private Shatter shatter;
         
         private void OnEnable()
         {
             // Debug.Log("ShatterEditor.OnEnable");
-            script = (Shatter)target;
+            shatter = (Shatter)target;
             SetupStates();
         }
 
         private void SetupStates()
         {
-            var r = script.testPlane.GetComponent<Renderer>();
-            if (r) r.enabled = script.enableTestPlane;
+            var r = shatter.testPlane.GetComponent<Renderer>();
+            if (r) r.enabled = shatter.enableTestPlane;
         }
 
         public override void OnInspectorGUI()
         {
             // serializedObject.Update(); // TODO: is this required - surely not?
 
-            script.objectToShatter = (GameObject)EditorGUILayout.ObjectField("Object to Shatter", script.objectToShatter, typeof(GameObject), true);
+            shatter.objectToShatter = (GameObject)EditorGUILayout.ObjectField("Object to Shatter", shatter.objectToShatter, typeof(GameObject), true);
 
-            if (!script.objectToShatter)
+            if (!shatter.objectToShatter)
             {
                 EditorGUILayout.LabelField("Add a GameObject to Shatter.");
                 return;
             }
 
-            if (!script.objectToShatter.activeInHierarchy)
+            if (!shatter.objectToShatter.activeInHierarchy)
             {
                 EditorGUILayout.LabelField("Object to slice is Hidden. Cannot Slice.");
                 return;
             }
 
-            script.crossSectionMaterial = (Material)EditorGUILayout.ObjectField("Cross Section Material", script.crossSectionMaterial, typeof(Material), false);
+            shatter.crossSectionMaterial = (Material)EditorGUILayout.ObjectField("Cross Section Material", shatter.crossSectionMaterial, typeof(Material), false);
 
-            var destroyOnComplete = (Shatter.DestroyOnCompleteType)EditorGUILayout.EnumPopup("Destroy on Complete", script.destroyOnComplete);
-            if (destroyOnComplete != script.destroyOnComplete)
+            var destroyOnComplete = (Shatter.DestroyOnCompleteType)EditorGUILayout.EnumPopup("Destroy on Complete", shatter.destroyOnComplete);
+            if (destroyOnComplete != shatter.destroyOnComplete)
             {
-                Undo.RegisterFullObjectHierarchyUndo(script, "Destroy on Complete");
-                script.destroyOnComplete = destroyOnComplete;
+                Undo.RegisterFullObjectHierarchyUndo(shatter, "Destroy on Complete");
+                shatter.destroyOnComplete = destroyOnComplete;
             }
 
-            var en = EditorGUILayout.Toggle("Enable Test Plane", script.enableTestPlane);
-            if (en != script.enableTestPlane)
+            var en = EditorGUILayout.Toggle("Enable Test Plane", shatter.enableTestPlane);
+            if (en != shatter.enableTestPlane)
             {
-                Undo.RegisterFullObjectHierarchyUndo(script, "Enable Test Plane");
-                script.enableTestPlane = en;
+                Undo.RegisterFullObjectHierarchyUndo(shatter, "Enable Test Plane");
+                shatter.enableTestPlane = en;
             }
 
-            if (script.enableTestPlane)
-                script.testPlane = (GameObject)EditorGUILayout.ObjectField("Test Plane", script.testPlane, typeof(GameObject), true);
+            if (shatter.enableTestPlane)
+                shatter.testPlane = (GameObject)EditorGUILayout.ObjectField("Test Plane", shatter.testPlane, typeof(GameObject), true);
             else
-                script.shatterCount = EditorGUILayout.IntSlider("Shatter Count", script.shatterCount, 1, 20);
+                shatter.shatterCount = EditorGUILayout.IntSlider("Shatter Count", shatter.shatterCount, 1, 20);
 
             var colorSave = GUI.backgroundColor;
             GUI.backgroundColor = Color.yellow;
-            if (GUILayout.Button($"\n{(script.enableTestPlane ? "Slice" : "Shatter")} '{script.objectToShatter.name}'\n"))
+            if (GUILayout.Button($"\n{(shatter.enableTestPlane ? "Slice" : "Shatter")} '{shatter.objectToShatter.name}'\n"))
             {
                 const string undoName = "Shatter";
 
@@ -74,24 +74,24 @@ namespace Shatter.Editor
                 // Undo.IncrementCurrentGroup();
                 Undo.SetCurrentGroupName(undoName);
 
-                // Undo.RegisterFullObjectHierarchyUndo(script.gameObject, undoName);
-                Undo.RegisterFullObjectHierarchyUndo(script.objectToShatter, undoName);
+                Undo.RegisterFullObjectHierarchyUndo(shatter.gameObject, undoName);
+                Undo.RegisterFullObjectHierarchyUndo(shatter.objectToShatter, undoName);
                 
 #if UNITY_EDITOR
                 SlicedHull.ResetDebug();
 #endif
 
                 // Perform the action
-                if (script.enableTestPlane)
-                    script.SlicePlane(script.testPlane);
+                if (shatter.enableTestPlane)
+                    shatter.SlicePlane(shatter.testPlane);
                 else
-                    script.RandomShatter();
+                    shatter.RandomShatter();
 
-                var objects = Array.ConvertAll(script.shards.ToArray(), shard => (Object)shard.gameObject);
+                var objects = Array.ConvertAll(shatter.shards.ToArray(), shard => (Object)shard.gameObject);
 
                 Selection.objects = objects;
 
-                foreach (var shard in script.shards)
+                foreach (var shard in shatter.shards)
                 {
                     Undo.RegisterCreatedObjectUndo(shard.gameObject, undoName);
                 }
@@ -100,14 +100,14 @@ namespace Shatter.Editor
             }
             GUI.backgroundColor = colorSave;
 
-            // if(script.objectToShatter.gameObject != script.gameObject)
-            if(script)
+            // if(shatter.objectToShatter.gameObject != shatter.gameObject)
+            if(shatter)
                 serializedObject.ApplyModifiedProperties();
             
-            // once you have an editor script apparently you are responsible for doing this
+            // once you have an editor shatter apparently you are responsible for doing this
             if (GUI.changed)
             {
-                // script.OnValidate();
+                // shatter.OnValidate();
                 SetupStates();
             }
         }
