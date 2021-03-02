@@ -63,13 +63,15 @@ namespace EzySlice
 
                 var shared = original.GetComponent<MeshRenderer>().sharedMaterials;
                 var mesh = original.GetComponent<MeshFilter>().sharedMesh;
+                
+                var newRenderer = newObject.GetComponent<MeshRenderer>();
 
                 // nothing changed in the hierarchy, the cross section must have been batched
                 // with the sub meshes, return as is, no need for any changes
                 if (mesh.subMeshCount == newMesh.subMeshCount)
                 {
                     // the the material information
-                    newObject.GetComponent<Renderer>().sharedMaterials = shared;
+                    newRenderer.sharedMaterials = shared;
                 }
                 else
                 {
@@ -80,8 +82,7 @@ namespace EzySlice
                     // copy our material arrays across using native copy (should be faster than loop)
                     System.Array.Copy(shared, newShared, shared.Length);
                     newShared[shared.Length] = crossSectionMat;
-                    // the the material information
-                    newObject.GetComponent<Renderer>().sharedMaterials = newShared;
+                    newRenderer.sharedMaterials = newShared;
                 }
             }
         }

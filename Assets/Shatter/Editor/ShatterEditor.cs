@@ -1,23 +1,32 @@
 using System;
 using EzySlice;
 using UnityEditor;
-using UnityEditorInternal;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
 namespace Shatter.Editor
 {
-    /**
- * This is a simple Editor helper script for rapid testing/prototyping! 
- */
     [CustomEditor(typeof(Shatter))]
     public class ShatterEditor : UnityEditor.Editor
     {
+        private Shatter script;
+        
+        private void OnEnable()
+        {
+            // Debug.Log("ShatterEditor.OnEnable");
+            script = (Shatter)target;
+            SetupStates();
+        }
+
+        private void SetupStates()
+        {
+            var r = script.testPlane.GetComponent<Renderer>();
+            if (r) r.enabled = script.enableTestPlane;
+        }
+
         public override void OnInspectorGUI()
         {
             // serializedObject.Update(); // TODO: is this required - surely not?
-
-            var script = (Shatter)target;
 
             script.objectToShatter = (GameObject)EditorGUILayout.ObjectField("Object to Shatter", script.objectToShatter, typeof(GameObject), true);
 
@@ -62,11 +71,11 @@ namespace Shatter.Editor
 
                 // Don't think this is required as the mouse down or some other event should have incremented it.
                 // This stuff is extremely unclear from any of the documentation as to when you should need to create an undo group.
-                Undo.IncrementCurrentGroup();
+                // Undo.IncrementCurrentGroup();
                 Undo.SetCurrentGroupName(undoName);
 
+                // Undo.RegisterFullObjectHierarchyUndo(script.gameObject, undoName);
                 Undo.RegisterFullObjectHierarchyUndo(script.objectToShatter, undoName);
-                // Undo.RegisterCompleteObjectUndo(script.shards, undoName);
                 
 #if UNITY_EDITOR
                 SlicedHull.ResetDebug();
@@ -78,27 +87,29 @@ namespace Shatter.Editor
                 else
                     script.RandomShatter();
 
-                var objects = Array.ConvertAll(script.shards.ToArray(), o => (Object)o);
+                var objects = Array.ConvertAll(script.shards.ToArray(), shard => (Object)shard.gameObject);
 
-                // if(script.enableTestPlane)
                 Selection.objects = objects;
 
-                foreach (var o in script.shards)
+                foreach (var shard in script.shards)
                 {
-                    Undo.RegisterCreatedObjectUndo(o, undoName);
+                    Undo.RegisterCreatedObjectUndo(shard.gameObject, undoName);
                 }
 
                 Undo.CollapseUndoOperations(Undo.GetCurrentGroup());
             }
             GUI.backgroundColor = colorSave;
 
-            // once you have an editor script apparently you are responsible for doing this
-            if (GUI.changed)
-                script.OnValidate();
-
             // if(script.objectToShatter.gameObject != script.gameObject)
             if(script)
                 serializedObject.ApplyModifiedProperties();
+            
+            // once you have an editor script apparently you are responsible for doing this
+            if (GUI.changed)
+            {
+                // script.OnValidate();
+                SetupStates();
+            }
         }
     }
 }

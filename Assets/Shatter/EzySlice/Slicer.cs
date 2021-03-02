@@ -514,7 +514,7 @@ namespace EzySlice
             // add the sub meshes
             for (var i = 0; i < totalTriangles; i++)
             {
-                newMesh.SetTriangles(triangles[i], i, false);
+                newMesh.SetTriangles(triangles[i], i, false); // Both meshes share vertices so the bounds will remain the same
             }
 
             return newMesh;

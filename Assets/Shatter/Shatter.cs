@@ -3,7 +3,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Security.Cryptography;
 using EzySlice;
 using UnityEditor;
 using UnityEngine;
@@ -256,17 +255,5 @@ namespace Shatter
                     throw new ArgumentOutOfRangeException();
             }
         }
-
-#if UNITY_EDITOR
-        public void OnValidate()
-        {
-            if (testPlane)
-            {
-                var r = testPlane.GetComponent<Renderer>();
-                if (r)
-                    r.enabled = enableTestPlane;
-            }
-        }
-#endif
     }
 }
