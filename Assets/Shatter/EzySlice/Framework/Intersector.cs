@@ -204,7 +204,7 @@ namespace EzySlice
                         var normalQ = tri.GenerateNormal(qa);
 
                         ta.SetNormal(tri.normalA, tri.normalB, normalQ);
-                        tb.SetNormal(normalQ, tri.normalB,tri. normalC);
+                        tb.SetNormal(normalQ, tri.normalB, tri.normalC);
                     }
 
                     // generate Tangent coordinates if there is any
@@ -415,9 +415,13 @@ namespace EzySlice
                         {
                             result.AddUpperHull(ta).AddLowerHull(tb).AddLowerHull(tc);
                         }
-                        else
+                        else if (sa == PlaneEx.SideOfPlane.Down)
                         {
                             result.AddLowerHull(ta).AddUpperHull(tb).AddUpperHull(tc);
+                        }
+                        else
+                        {
+                            int q = 0;
                         }
                     }
                 }

@@ -46,8 +46,10 @@ namespace EzySlice
             Debug.Assert(upperHullMesh || lowerHullMesh, "There should be at least one hull mesh to create a SlicedHull");
             hullMesh[0] = upperHullMesh;
             hullMesh[1] = lowerHullMesh;
-            hullVolume[0] = upperHullMesh.CalculateVolume(upperHullVertices);
-            hullVolume[1] = lowerHullMesh.CalculateVolume(lowerHullVertices);
+            if(upperHullMesh)
+                hullVolume[0] = upperHullMesh.CalculateVolume(upperHullVertices);
+            if(lowerHullMesh)
+                hullVolume[1] = lowerHullMesh.CalculateVolume(lowerHullVertices);
         }
 
         private void CreateHull(int hullIndex, GameObject original, Material crossSectionMat)

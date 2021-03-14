@@ -50,8 +50,15 @@ namespace Shatter.Editor
                 Undo.RegisterFullObjectHierarchyUndo(shatter, "Destroy on Complete");
                 shatter.destroyOnComplete = destroyOnComplete;
             }
-
-            var en = EditorGUILayout.Toggle("Enable Test Plane", shatter.enableTestPlane);
+            
+            var en = EditorGUILayout.Toggle("Enable Gravity", shatter.enableGravity);
+            if (en != shatter.enableGravity)
+            {
+                Undo.RegisterFullObjectHierarchyUndo(shatter, "Enable Gravity");
+                shatter.enableGravity = en;
+            }
+            
+            en = EditorGUILayout.Toggle("Enable Test Plane", shatter.enableTestPlane);
             if (en != shatter.enableTestPlane)
             {
                 Undo.RegisterFullObjectHierarchyUndo(shatter, "Enable Test Plane");
@@ -72,6 +79,7 @@ namespace Shatter.Editor
                 // Don't think this is required as the mouse down or some other event should have incremented it.
                 // This stuff is extremely unclear from any of the documentation as to when you should need to create an undo group.
                 // Undo.IncrementCurrentGroup();
+                
                 Undo.SetCurrentGroupName(undoName);
 
                 Undo.RegisterFullObjectHierarchyUndo(shatter.gameObject, undoName);
@@ -87,11 +95,11 @@ namespace Shatter.Editor
                 else
                     shatter.RandomShatter();
 
-                var objects = Array.ConvertAll(shatter.shards.ToArray(), shard => (Object)shard.gameObject);
+                var objects = Array.ConvertAll(shatter.shrapnels.ToArray(), shard => (Object)shard.gameObject);
 
                 Selection.objects = objects;
 
-                foreach (var shard in shatter.shards)
+                foreach (var shard in shatter.shrapnels)
                 {
                     Undo.RegisterCreatedObjectUndo(shard.gameObject, undoName);
                 }

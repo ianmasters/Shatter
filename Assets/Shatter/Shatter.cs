@@ -4,7 +4,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using EzySlice;
-using UnityEditor;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -30,11 +29,19 @@ namespace Shatter
         [Tooltip("How many iterations to shatter")]
         public int shatterCount;
 
-        public List<Shard> shards;
+        public List<Shrapnel> shrapnels;
+
+        [Range(0f, 5f), Tooltip(">0 will fade shrapnel out")]
+        public float fadeOutTime;
+
+        [Tooltip("Enable gravity for shrapnel when shattered")]
+        public bool enableGravity;
 
 #if DEBUG
+        [Tooltip("Enable test plane for a single slice")]
         public bool enableTestPlane;
-        public GameObject testPlane;
+
+        [Tooltip("Test plane object to use")] public GameObject testPlane;
 #endif
 
         private void Awake()
@@ -47,7 +54,7 @@ namespace Shatter
 #endif
         public void SlicePlane(GameObject planeObject)
         {
-            shards = new List<Shard>();
+            shrapnels = new List<Shrapnel>();
 
             var plane = new Plane(planeObject.transform.up, planeObject.transform.position);
             var textureRegion = new TextureRegion(0.0f, 0.0f, 1.0f, 1.0f);
@@ -63,10 +70,8 @@ namespace Shatter
             else DestroyImmediate(objectToShatter);
         }
 
-        private SlicedHull RandomSliceObject(GameObject obj)
+        private SlicedHull RandomSliceObject(GameObject obj, TextureRegion textureRegion)
         {
-            var textureRegion = new TextureRegion(0.0f, 0.0f, 1.0f, 1.0f);
-
             var r = obj.GetComponent<Renderer>();
 
             // if (newMaterials is null) newMaterials = r.materials;
@@ -79,7 +84,7 @@ namespace Shatter
                 textureRegion,
                 crossSectionMaterial);
 
-            // PostShatter(objectToShatter, slicedHull);
+            PostShatter(objectToShatter, slicedHull);
 
 #if SHOW_DEBUG_SPHERE
             debugSphere = new BoundingSphere(objBounds.center, objBounds.extents.magnitude /* * oneOnSqrt2*/);
@@ -107,10 +112,10 @@ namespace Shatter
 
         public void Gravity()
         {
-            if (shards.Count > 0)
+            if (shrapnels.Count > 0)
             {
-                var g = !shards[0].GetComponent<Rigidbody>().useGravity;
-                foreach (var s in shards)
+                var g = !shrapnels[0].GetComponent<Rigidbody>().useGravity;
+                foreach (var s in shrapnels)
                 {
                     s.GetComponent<Rigidbody>().useGravity = g;
                 }
@@ -127,13 +132,15 @@ namespace Shatter
         {
             print($"RandomShatter {objectToShatter.name}");
 
-            shards = new List<Shard>();
+            shrapnels = new List<Shrapnel>();
+
+            var textureRegion = new TextureRegion(0.0f, 0.0f, 1.0f, 1.0f);
 
             var allSlicedHulls = new List<SlicedHull>();
-
-            allSlicedHulls.Add(RandomSliceObject(objectToShatter));
-            // var m = allSlicedHulls[0].HullObject(0).GetComponent<MeshRenderer>().materials;
-
+            allSlicedHulls.Add(RandomSliceObject(objectToShatter, textureRegion));
+#if DEBUG
+            var materialsTest = allSlicedHulls[0].HullObject(0).GetComponent<MeshRenderer>().sharedMaterials;
+#endif
             for (var i = 1; i < shatterCount; ++i)
             {
                 var count = allSlicedHulls.Count;
@@ -143,7 +150,7 @@ namespace Shatter
                     for (var k = 0; k < 2; ++k)
                     {
                         var obj = hull.HullObject(k);
-                        var slicedHull = RandomSliceObject(obj);
+                        var slicedHull = RandomSliceObject(obj, textureRegion);
 
                         if (slicedHull != null)
                         {
@@ -156,65 +163,62 @@ namespace Shatter
                             // Debug.Break();
                             // add the hull back in and try again
                             // allSlicedHulls.Add(slicedHull);
-                            shards.Add(obj.AddComponent<Shard>());
+                            shrapnels.Add(obj.AddComponent<Shrapnel>());
                         }
                     }
                 }
                 allSlicedHulls.RemoveRange(0, count);
             }
 
-            foreach (var slicedHull in allSlicedHulls)
-            {
-                PostShatter(objectToShatter, slicedHull);
-            }
+            // PostShatter(objectToShatter);
 
             if (Application.isPlaying) Destroy(objectToShatter);
             else DestroyImmediate(objectToShatter);
         }
 
+        // Add colliders, rigidbodies etc. for the final objects ready to go into the world.
         private void PostShatter(GameObject initialObject, SlicedHull slicedHull)
         {
-            if (slicedHull == null)
-                return;
-
-            Debug.Assert(slicedHull.HullMesh(0) && slicedHull.HullMesh(1), "There should be an upper and lower hull");
-
-            // add rigidbodies and colliders
-            var rbSource = initialObject.GetComponentInChildren<Rigidbody>();
-            for (var i = 0; i < 2; ++i)
+            // foreach (var slicedHull in allSlicedHulls)
             {
-                var shattered = slicedHull.HullObject(i);
-                Debug.Assert(!shattered.GetComponent<MeshCollider>());
-                shattered.AddComponent<MeshCollider>().convex = true;
-                if (rbSource)
-                {
-                    var rb = shattered.AddComponent<Rigidbody>();
-                    rb.detectCollisions = false;
-                    rb.velocity = rbSource.velocity;
-                    rb.angularVelocity = rbSource.angularVelocity;
-                    rb.useGravity = rbSource.useGravity; // TODO: use gravity?
-                    rb.isKinematic = rbSource.isKinematic;
-                    rb.drag = rbSource.drag;
-                    rb.angularDrag = rbSource.angularDrag;
-                    rb.mass = rbSource.mass * slicedHull.HullVolume(i) / slicedHull.SourceVolume;
+                Debug.Assert(slicedHull != null);
 
-                    if (Application.isPlaying)
+                var rbSource = initialObject.GetComponentInChildren<Rigidbody>();
+                for (var i = 0; i < 2; ++i)
+                {
+                    var hullShrapnel = slicedHull.HullObject(i);
+                    if (hullShrapnel)
                     {
-                        var enableCollisions = shattered.AddComponent<EnableCollisions>();
-                        enableCollisions.enableGravity = true;
-                        // enableCollisions.enableAfterFrames = 60;
+                        Debug.Assert(!hullShrapnel.GetComponent<MeshCollider>());
+                        hullShrapnel.AddComponent<MeshCollider>().convex = true;
+                        if (rbSource)
+                        {
+                            var rb = hullShrapnel.AddComponent<Rigidbody>();
+                            rb.detectCollisions = false;
+                            rb.velocity = rbSource.velocity;
+                            rb.angularVelocity = rbSource.angularVelocity;
+                            rb.useGravity = enableGravity;
+                            rb.isKinematic = rbSource.isKinematic;
+                            rb.drag = rbSource.drag;
+                            rb.angularDrag = rbSource.angularDrag;
+                            rb.mass = rbSource.mass * slicedHull.HullVolume(i) / slicedHull.SourceVolume;
+
+                            if (Application.isPlaying)
+                            {
+                                hullShrapnel.AddComponent<EnableCollisions>();
+                            }
+                        }
+                        shrapnels.Add(hullShrapnel.AddComponent<Shrapnel>());
                     }
                 }
 
-                shards.Add(shattered.AddComponent<Shard>());
+                // Shards.Remove(initialObject);
+
+                // foreach (var shrapnel in shrapnels)
+                // {
+                //     var rb = shrapnel.GetComponent<Rigidbody>();
+                // }
             }
-
-            // Shards.Remove(initialObject);
-
-            // foreach (var shard in shards)
-            // {
-            //     var rb = shard.GetComponent<Rigidbody>();
-            // }
 
             if (destroyOnComplete != DestroyOnCompleteType.Disabled)
             {
@@ -227,7 +231,7 @@ namespace Shatter
             var n = 0;
             for (;;)
             {
-                foreach (var shard in shards)
+                foreach (var shard in shrapnels)
                 {
                     if (shard)
                         ++n;

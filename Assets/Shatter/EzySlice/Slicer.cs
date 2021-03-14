@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 // ReSharper disable once CheckNamespace
@@ -45,7 +46,7 @@ namespace EzySlice
              * Check if proper slicing has occured for this sub mesh. Slice occured if there
              * are triangles in both the upper and lower hulls
              */
-            public bool IsValid => upperHull.Count > 0 && lowerHull.Count > 0;
+            public bool IsValid => upperHull.Count > 0 || lowerHull.Count > 0;
         }
 
         /**
@@ -267,7 +268,7 @@ namespace EzySlice
                 // because we need to go through the generation step
                 if (slice != null && slice.IsValid)
                 {
-                    return CreateFrom(slices, CreateFrom(crossHull, plane.normal, region), crossIndex);
+                    return CreateFrom(slices, CreateFrom(crossHull.Count > 0 ? crossHull : sourceVertices.ToList(), plane.normal, region), crossIndex);
                 }
             }
 
