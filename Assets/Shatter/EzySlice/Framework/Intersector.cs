@@ -419,10 +419,12 @@ namespace EzySlice
                         {
                             result.AddLowerHull(ta).AddUpperHull(tb).AddUpperHull(tc);
                         }
+#if SHITDEBUG
                         else
                         {
                             int q = 0;
                         }
+#endif
                     }
                 }
             }

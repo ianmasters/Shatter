@@ -72,6 +72,12 @@ namespace Shatter
 
         private SlicedHull RandomSliceObject(GameObject obj, TextureRegion textureRegion)
         {
+#if DEBUG
+            if (!obj)
+            {
+                int q = 0;
+            }
+#endif
             var r = obj.GetComponent<Renderer>();
 
             // if (newMaterials is null) newMaterials = r.materials;
@@ -150,20 +156,23 @@ namespace Shatter
                     for (var k = 0; k < 2; ++k)
                     {
                         var obj = hull.HullObject(k);
-                        var slicedHull = RandomSliceObject(obj, textureRegion);
+                        if (obj)
+                        {
+                            var slicedHull = RandomSliceObject(obj, textureRegion);
 
-                        if (slicedHull != null)
-                        {
-                            allSlicedHulls.Add(slicedHull);
-                            if (Application.isPlaying) Destroy(obj);
-                            else DestroyImmediate(obj);
-                        }
-                        else
-                        {
-                            // Debug.Break();
-                            // add the hull back in and try again
-                            // allSlicedHulls.Add(slicedHull);
-                            shrapnels.Add(obj.AddComponent<Shrapnel>());
+                            if (slicedHull != null)
+                            {
+                                allSlicedHulls.Add(slicedHull);
+                                if (Application.isPlaying) Destroy(obj);
+                                else DestroyImmediate(obj);
+                            }
+                            else
+                            {
+                                // Debug.Break();
+                                // add the hull back in and try again
+                                // allSlicedHulls.Add(slicedHull);
+                                shrapnels.Add(obj.AddComponent<Shrapnel>());
+                            }
                         }
                     }
                 }

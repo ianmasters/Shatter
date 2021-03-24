@@ -1,6 +1,7 @@
 using System.Security.Authentication.ExtendedProtection.Configuration;
 using UnityEngine;
 using Extensions;
+using UnityEngine.Rendering;
 
 // ReSharper disable once CheckNamespace
 namespace EzySlice
@@ -63,7 +64,8 @@ namespace EzySlice
                 newObject.transform.localRotation = original.transform.localRotation;
                 newObject.transform.localScale = original.transform.localScale;
 
-                var shared = original.GetComponent<MeshRenderer>().sharedMaterials;
+                var sharedMaterials = original.GetComponent<MeshRenderer>().sharedMaterials;
+
                 var mesh = original.GetComponent<MeshFilter>().sharedMesh;
                 
                 var newRenderer = newObject.GetComponent<MeshRenderer>();
@@ -73,17 +75,17 @@ namespace EzySlice
                 if (mesh.subMeshCount == newMesh.subMeshCount)
                 {
                     // the the material information
-                    newRenderer.sharedMaterials = shared;
+                    newRenderer.sharedMaterials = sharedMaterials;
                 }
                 else
                 {
                     // otherwise the cross section was added to the back of the sub mesh array because
                     // it uses a different material. We need to take this into account
-                    var newShared = new Material[shared.Length + 1];
+                    var newShared = new Material[sharedMaterials.Length + 1];
 
                     // copy our material arrays across using native copy (should be faster than loop)
-                    System.Array.Copy(shared, newShared, shared.Length);
-                    newShared[shared.Length] = crossSectionMat;
+                    System.Array.Copy(sharedMaterials, newShared, sharedMaterials.Length);
+                    newShared[sharedMaterials.Length] = crossSectionMat;
                     newRenderer.sharedMaterials = newShared;
                 }
             }

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 // ReSharper disable once CheckNamespace
@@ -76,16 +75,6 @@ namespace EzySlice
                 return null;
             }
 
-            // TODO: only a copy here currently works. Pass in a copy?
-#if !POO
-            var materials = renderer.sharedMaterials;
-#else
-            Material[] materials;
-            if (Application.isPlaying)
-                materials = renderer.sharedMaterials;
-            else
-                materials = renderer.materials;
-#endif
             var mesh = filter.sharedMesh;
 
             // cannot shatterCount a mesh that doesn't exist
@@ -97,6 +86,7 @@ namespace EzySlice
             }
 
             var subMeshCount = mesh.subMeshCount;
+            var materials = renderer.sharedMaterials;
 
             // to make things straightforward, exit without slicing if the materials and mesh
             // array don't match. This shouldn't happen anyway
@@ -126,7 +116,10 @@ namespace EzySlice
                 }
             }
 
-            return Slice(mesh, plane, crossRegion, crossIndex);
+            var sliced = Slice(mesh, plane, crossRegion, crossIndex);
+            // if (sliced.HullObject(0)) sliced.HullObject(0).GetComponent<Renderer>().materials = materials;
+            // if (sliced.HullObject(1)) sliced.HullObject(1).GetComponent<Renderer>().materials = materials;
+            return sliced;
         }
 
         /**
@@ -166,9 +159,9 @@ namespace EzySlice
 
             // iterate over all the sub meshes individually. vertices and indices
             // are all shared within the sub mesh
-            var mesh = new SlicedSubMesh();
             for (var subMesh = 0; subMesh < subMeshCount; subMesh++)
             {
+                var mesh = new SlicedSubMesh();
                 var indices = sharedMesh.GetTriangles(subMesh);
                 var indicesCount = indices.Length;
 
@@ -246,13 +239,13 @@ namespace EzySlice
                             side = sc;
                         }
 
-                        if (side == PlaneEx.SideOfPlane.Up || side == PlaneEx.SideOfPlane.On)
+                        if (side == PlaneEx.SideOfPlane.Down)
                         {
-                            mesh.upperHull.Add(newTri);
+                            mesh.lowerHull.Add(newTri);
                         }
                         else
                         {
-                            mesh.lowerHull.Add(newTri);
+                            mesh.upperHull.Add(newTri);
                         }
                     }
                 }
@@ -264,11 +257,10 @@ namespace EzySlice
             // check if slicing actually occured
             foreach (var slice in slices)
             {
-                // check if at least one of the sub meshes was sliced. If so, stop checking
-                // because we need to go through the generation step
+                // check if at least one of the sub meshes was sliced. If so, stop checking because we need to go through the generation step
                 if (slice != null && slice.IsValid)
                 {
-                    return CreateFrom(slices, CreateFrom(crossHull.Count > 0 ? crossHull : sourceVertices.ToList(), plane.normal, region), crossIndex);
+                    return CreateFrom(slices, CreateFrom(crossHull.Count > 0 ? crossHull.ToArray() : sourceVertices, plane.normal, region), crossIndex);
                 }
             }
 
@@ -281,32 +273,20 @@ namespace EzySlice
          */
         private static SlicedHull CreateFrom(in SlicedSubMesh[] meshes, in List<Triangle> crossRegion, int crossSectionIndex)
         {
-            var subMeshCount = meshes.Length;
-
             var upperHullCount = 0;
             var lowerHullCount = 0;
 
             // get the total amount of upper, lower and intersection counts
-            for (var subMesh = subMeshCount - 1; subMesh >= 0; subMesh--)
+            foreach (var mesh in meshes)
             {
-                upperHullCount += meshes[subMesh].upperHull.Count;
-                lowerHullCount += meshes[subMesh].lowerHull.Count;
+                upperHullCount += mesh.upperHull.Count;
+                lowerHullCount += mesh.lowerHull.Count;
             }
 
-            Mesh upperHull = CreateUpperHull(meshes, upperHullCount, crossRegion, crossSectionIndex, out var upperHullVertices);
-            Mesh lowerHull = CreateLowerHull(meshes, lowerHullCount, crossRegion, crossSectionIndex, out var lowerHullVertices);
+            Mesh upperHull = CreateHull(meshes, upperHullCount, crossRegion, crossSectionIndex, true, out var upperHullVertices);
+            Mesh lowerHull = CreateHull(meshes, lowerHullCount, crossRegion, crossSectionIndex, false, out var lowerHullVertices);
 
             return new SlicedHull(upperHull, lowerHull, upperHullVertices, lowerHullVertices);
-        }
-
-        private static Mesh CreateUpperHull(in SlicedSubMesh[] mesh, int total, in List<Triangle> crossSection, int crossSectionIndex, out Vector3[] hullVertices)
-        {
-            return CreateHull(mesh, total, crossSection, crossSectionIndex, true, out hullVertices);
-        }
-
-        private static Mesh CreateLowerHull(in SlicedSubMesh[] mesh, int total, in List<Triangle> crossSection, int crossSectionIndex, out Vector3[] hullVertices)
-        {
-            return CreateHull(mesh, total, crossSection, crossSectionIndex, false, out hullVertices);
         }
 
         /**
@@ -346,7 +326,7 @@ namespace EzySlice
             for (var subMesh = 0; subMesh < subMeshCount; subMesh++)
             {
                 // pick the hull we will be playing around with
-                var hull = isUpper ? meshes[subMesh].upperHull : meshes[subMesh].lowerHull;
+                List<Triangle> hull = isUpper ? meshes[subMesh].upperHull : meshes[subMesh].lowerHull;
                 var hullCount = hull.Count;
 
                 var indices = new int[hullCount * 3];
@@ -356,7 +336,7 @@ namespace EzySlice
                 {
                     var newTri = hull[i];
 
-                    var i0 = vIndex + 0;
+                    var i0 = vIndex;
                     var i1 = vIndex + 1;
                     var i2 = vIndex + 2;
 
@@ -410,7 +390,7 @@ namespace EzySlice
                 {
                     Triangle newTri = crossSection[i];
 
-                    var i0 = vIndex + 0;
+                    var i0 = vIndex;
                     var i1 = vIndex + 1;
                     var i2 = vIndex + 2;
 
@@ -525,7 +505,7 @@ namespace EzySlice
          * Generate Two Meshes (an upper and lower) cross section from a set of intersection
          * points and a plane Normal. Intersection Points do not have to be in order.
          */
-        private static List<Triangle> CreateFrom(in List<Vector3> intPoints, in Vector3 planeNormal, in TextureRegion region)
+        private static List<Triangle> CreateFrom(in Vector3[] intPoints, in Vector3 planeNormal, in TextureRegion region)
         {
             if (Triangulator.MonotoneChain(intPoints, planeNormal, out var tris, region))
             {

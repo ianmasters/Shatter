@@ -36,7 +36,7 @@ namespace EzySlice
          * 
          * See MonotoneChain(vertices, Normal, tri, TextureRegion) for full explanation
          */
-        public static bool MonotoneChain(in List<Vector3> vertices, in Vector3 normal, out List<Triangle> tri)
+        public static bool MonotoneChain(in Vector3[] vertices, in Vector3 normal, out List<Triangle> tri)
         {
             // default texture region is in coordinates 0,0 to 1,1
             return MonotoneChain(vertices, normal, out tri, new TextureRegion(0.0f, 0.0f, 1.0f, 1.0f));
@@ -48,9 +48,9 @@ namespace EzySlice
          * plane defined as planeNormal. Algorithm will output vertices, indices and UV coordinates
          * as arrays
          */
-        public static bool MonotoneChain(in List<Vector3> vertices, in Vector3 normal, out List<Triangle> tri, in TextureRegion texRegion)
+        public static bool MonotoneChain(in Vector3[] vertices, in Vector3 normal, out List<Triangle> tri, in TextureRegion texRegion)
         {
-            var count = vertices.Count;
+            var count = vertices.Length;
 
             // we cannot triangulate less than 3 points. Use minimum of 3 points
             if (count < 3)
